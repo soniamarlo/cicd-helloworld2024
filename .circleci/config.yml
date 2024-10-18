@@ -1,0 +1,45 @@
+version: 2.1
+
+defaults: &defaults
+  working_directory: ~/repo
+  docker:
+    - image: cimg/node:20.5.1
+
+orbs:
+  sonarcloud: sonarsource/sonarcloud@2.0.0
+
+jobs:
+  test:
+    <<: *defaults  
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ checksum "package.json" }}
+          # fallback to using the latest cache if no exact match is found
+          - v1-dependencies-
+
+      - run: npm install
+      - run:
+          name: Run lint
+          command: npm run lint:report
+      - run:
+          name: Run tests
+          command: npm run test:coverage
+      - sonarcloud/scan
+      - save_cache:
+          paths:
+            - node_modules
+          key: v1-dependencies-{{ checksum "package.json" }}
+      - store_test_results:
+          path: test-results.xml
+      - persist_to_workspace:
+          root: ~/repo
+          paths: .
+            
+workflows:
+  test-deploy:
+    jobs:
+      - test
+          
